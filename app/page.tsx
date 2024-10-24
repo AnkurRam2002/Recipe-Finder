@@ -3,14 +3,7 @@
 import { useState, useRef, ChangeEvent } from 'react'
 import { Camera, Upload, ChefHat, Utensils, Globe, Info, X } from 'lucide-react'
 import CameraCapture from './components/CameraCapture'
-
-interface DishResult {
-  name: string
-  region?: string
-  ingredients?: string[]
-  instructions?: string[]
-  funFacts?: string[]
-}
+import { DishResult } from './types'
 
 export default function Home() {
   const [image, setImage] = useState<File | Blob | null>(null)
