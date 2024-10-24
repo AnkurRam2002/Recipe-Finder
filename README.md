@@ -1,3 +1,27 @@
+<h1 align="center">Recipe Finder - AI-powered Dish Identification</h1>
+
+The Recipe Finder is a web application that uses AI to identify dishes from images uploaded by users or captured directly through their device's camera. This project leverages advanced AI technology to provide accurate identification of dishes and suggest relevant recipes, making it a useful tool for food enthusiasts, chefs, and home cooks.
+
+<h3>Features</h3>
+
+- AI-based Dish Identification: Upload a picture or capture one using your device’s camera to instantly identify the dish.
+- Camera Integration: Directly access your device's camera for a seamless dish identification experience.
+- Recipe Suggestions: Get accurate identification of the dish along with suggested recipes to try at home.
+- Real-time Results: Fast and efficient identification and recipe suggestions within seconds.
+- User-friendly Interface: Intuitive and responsive design made with Tailwind CSS for a smooth user experience.
+- Mobile-first Design: Optimized primarily for mobile devices, ensuring seamless functionality across different screen sizes.
+- API-powered: Integrated with Gemini Flash API for fast and efficient AI-based identification.
+
+<h3>Technologies Used</h3>
+
+- Next.js: React-based framework for server-side rendering and building scalable web applications.
+- Tailwind CSS: Utility-first CSS framework for designing a responsive and modern UI.
+- Gemini Flash API: AI-powered API for identifying dishes based on image input.
+- Camera API Integration: Allows capturing images directly from the user’s device camera for easy dish identification.
+- Node.js: Used for backend operations and server management.
+
+<br>
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
