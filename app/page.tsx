@@ -1,7 +1,16 @@
 'use client'
+
 import { useState, useRef, ChangeEvent } from 'react'
-import { Camera, Upload, ChefHat, Utensils, Globe, Info } from 'lucide-react'
-import { DishResult } from './types'
+import { Camera, Upload, ChefHat, Utensils, Globe, Info, X } from 'lucide-react'
+import CameraCapture from './components/CameraCapture'
+
+interface DishResult {
+  name: string
+  region?: string
+  ingredients?: string[]
+  instructions?: string[]
+  funFacts?: string[]
+}
 
 export default function Home() {
   const [image, setImage] = useState<File | Blob | null>(null)
@@ -9,10 +18,10 @@ export default function Home() {
   const [loading, setLoading] = useState<boolean>(false)
   const [result, setResult] = useState<DishResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showCamera, setShowCamera] = useState<boolean>(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [showCamera, setShowCamera] = useState<boolean>(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -27,45 +36,43 @@ export default function Home() {
     }
   }
 
-  const startCamera = async (): Promise<void> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      })
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
-      setShowCamera(true)
-    } catch (err) {
-      setError('Error accessing camera. Please make sure you have granted camera permissions.')
-      console.error('Error accessing camera:', err)
-    }
+  const handleCameraCapture = (imageBlob: Blob) => {
+    setImage(imageBlob)
+    const imageUrl = URL.createObjectURL(imageBlob)
+    setPreview(imageUrl)
+    setShowCamera(false)
+    identifyDish(imageBlob)
+
+    // Cleanup URL
+    return () => URL.revokeObjectURL(imageUrl)
   }
 
-  const capturePhoto = (): void => {
-    if (!videoRef.current) return
+  const handleRemoveImage = () => {
+    // Cancel ongoing analysis if it exists
+    if (loading && abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
 
-    const canvas = document.createElement('canvas')
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
-    const context = canvas.getContext('2d')
-    
-    if (context && videoRef.current) {
-      context.drawImage(videoRef.current, 0, 0)
-      canvas.toBlob((blob) => {
-        if (blob) {
-          setImage(blob)
-          setPreview(canvas.toDataURL())
-          setShowCamera(false)
-          const stream = videoRef.current?.srcObject as MediaStream
-          stream?.getTracks().forEach(track => track.stop())
-          identifyDish(blob)
-        }
-      }, 'image/jpeg')
+    setImage(null)
+    setPreview(null)
+    setResult(null)
+    setError(null)
+    setLoading(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
   const identifyDish = async (imageFile: File | Blob): Promise<void> => {
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController()
+
     setLoading(true)
     setError(null)
     
@@ -75,7 +82,8 @@ export default function Home() {
 
       const response = await fetch('/api/identify', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: abortControllerRef.current.signal
       })
 
       if (!response.ok) {
@@ -85,10 +93,14 @@ export default function Home() {
       const data: DishResult = await response.json()
       setResult(data)
     } catch (error) {
-      setError('Failed to identify dish. Please try again.')
-      console.error('Error identifying dish:', error)
+      // Only set error if it's not an abort error
+      if (error instanceof Error && error.name !== 'AbortError') {
+        setError('Failed to identify dish. Please try again.')
+        console.error('Error identifying dish:', error)
+      }
     } finally {
       setLoading(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -114,14 +126,14 @@ export default function Home() {
         className="w-full sm:w-auto flex-1 min-w-48 flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
       >
         <Upload size={20} />
-        Upload New Photo
+        Upload Photo
       </button>
       <button
-        onClick={startCamera}
+        onClick={() => setShowCamera(true)}
         className="w-full sm:w-auto flex-1 min-w-48 flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-xl hover:from-pink-700 hover:to-purple-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
       >
         <Camera size={20} />
-        Take New Photo
+        Take Photo
       </button>
       <input
         type="file"
@@ -155,40 +167,24 @@ export default function Home() {
           </div>
         )}
         
-        {/* Always show input options unless camera is active */}
-        {!showCamera && <InputOptions />}
+        <InputOptions />
 
         {showCamera && (
-          <div className="relative rounded-2xl overflow-hidden shadow-xl border-4 border-white">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              className="w-full rounded-xl"
-            />
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
-              <button
-                onClick={capturePhoto}
-                className="px-8 py-4 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full hover:from-red-600 hover:to-pink-600 transition-all duration-300 shadow-lg hover:shadow-xl"
-              >
-                Capture Photo
-              </button>
-              <button
-                onClick={() => {
-                  const stream = videoRef.current?.srcObject as MediaStream;
-                  stream?.getTracks().forEach(track => track.stop());
-                  setShowCamera(false);
-                }}
-                className="px-8 py-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-full hover:from-gray-600 hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+          <CameraCapture
+            onCapture={handleCameraCapture}
+            onClose={() => setShowCamera(false)}
+          />
         )}
 
         {preview && (
-          <div className="mt-8 bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-white">
+          <div className="mt-8 bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-white relative">
+            <button
+              onClick={handleRemoveImage}
+              className="absolute -top-3 -right-3 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-colors duration-200"
+              aria-label="Remove image"
+            >
+              <X size={20} />
+            </button>
             <img
               src={preview}
               alt="Preview"
@@ -208,7 +204,7 @@ export default function Home() {
           <div className="mt-8 bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl border border-white">
             <h2 className="text-3xl font-bold mb-6 text-purple-800">{result.name}</h2>
             
-            {/* Region Section - Only show if region exists */}
+            {/* Region Section */}
             {result.region && (
               <ResultSection 
                 title="Regional Information" 
